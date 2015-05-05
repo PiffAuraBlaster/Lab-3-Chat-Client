@@ -1,35 +1,45 @@
 require "socket"
 
 class Server
-  def initialize(port, ip)
-    @server = TCPServer.open(ip, port)
-    @connections  = 
-    {
-      clients:{ client_name: {attributes}, ...} 
-    }
-    @rooms = {}
-    @clients = {}
+  def initialize( port, ip )
+    @server = TCPServer.open( ip, port )
+    @connections = Hash.new
+    @rooms = Hash.new
+    @clients = Hash.new
+    @connections[:server] = @server
+    @connections[:rooms] = @rooms
+    @connections[:clients] = @clients
+    run
   end
-  
+ 
   def run
-    loop 
-    {
-     #For each user connected by server, creates a new thread.
-     Thread.start(@server.accept) do | client |
-       name = client.gets.chomp.to_sym
-       @connection[:clients].each do |other_name, other_client|
-         if nick_name == other_name || client == other_client
-           client.puts "This username already exsists."
-           Thread.kill self
-         end
-       end
-       puts "#{nick_name} #{client}"
-       @connection[:clients][nick_name] = client
-       client.puts "You connected! Chat your heart out!"
-     end 
+    loop {
+      Thread.start(@server.accept) do | client |
+        nick_name = client.gets.chomp.to_sym
+        @connections[:clients].each do |other_name, other_client|
+          if nick_name == other_name || client == other_client
+            client.puts "Error: username already exists"
+            Thread.kill self
+          end
+        end
+        puts "#{nick_name} #{client}"
+        @connections[:clients][nick_name] = client
+        client.puts "You connected! Chat your heart out!"
+        listen_user_messages( nick_name, client )
+      end
+    }.join
+  end
+ 
+  def listen_user_messages( username, client )
+    loop {
+      msg = client.gets.chomp
+      @connections[:clients].each do |other_name, other_client|
+        unless other_name == username
+          other_client.puts "#{username.to_s}: #{msg}"
+        end
+      end
     }
   end
-  
 end
-server = Server.new("localhost", 3000)
-server.run
+ 
+Server.new( 3000, "localhost" )
